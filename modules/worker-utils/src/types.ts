@@ -9,7 +9,7 @@ export type WorkerOptions = {
   maxMobileConcurrency?: number;
   reuseWorkers?: boolean;
   _workerType?: string;
-  [key: string]: any;
+  [key: string]: any; // TODO
 };
 
 /**
@@ -59,7 +59,7 @@ export type WorkerMessageType =
 
 export type WorkerMessagePayload = {
   id?: number;
-  options?: object;
+  options?: {[key: string]: any};
   input?: any; // Transferable;
   result?: any; // Transferable
   error?: string;
