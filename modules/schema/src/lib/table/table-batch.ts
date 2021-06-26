@@ -1,17 +1,4 @@
-export type Field = any;
-
-export type Schema = {
-  [key: string]: Field;
-};
-
-export type Batch = {
-  data: any;
-  schema: Schema;
-  length: number;
-  bytesUsed?: number;
-  count?: number;
-  cursor?: number;
-};
+import type {Batch, Schema} from '../../category/common';
 
 export interface TableBatchOptions {}
 
@@ -23,13 +10,10 @@ export interface TableBatchConstructor {
  * TableBatchBuilder builds batches conforming to this interface
  */
 export interface TableBatch {
+  /** Number of rows */
+  rowCount(): number;
+  /** Add one row */
   addRow(row): void;
-
-  chunkComplete(): void;
-
-  isFull(): boolean;
-
-  // hasBatch(): boolean;
-
+  /** return a batch object */
   getBatch(): Batch | null;
 }

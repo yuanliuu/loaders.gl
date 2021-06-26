@@ -1,26 +1,25 @@
-import {TableBatch, Schema, Batch} from './table-batch';
+import type {Schema, Batch} from '../../category/common';
+import {TableBatch} from './table-batch';
 
 type ColumnarTableBatchOptions = {
   batchSize?: number | string;
 };
 
+const DEFAULT_ROW_COUNT = 100;
+
 export default class ColumnarTableBatch implements TableBatch {
   schema: Schema;
-  batchSize: number | string;
-  length: number;
-  allocated: number | string;
-  columns: Array<any>;
-  isChunkComplete: boolean;
+  length: number = 0;
+  allocated: number = 0;
+  columns: Array<any> = [];
 
   constructor(schema: Schema, options: ColumnarTableBatchOptions = {}) {
     this.schema = schema;
-    this.batchSize = options.batchSize || 'auto';
-    this.length = 0;
-    this.allocated = 0;
-    this.columns = [];
-    this.isChunkComplete = false;
-
     this._reallocateColumns();
+  }
+
+  rowCount(): number {
+    return this.length;
   }
 
   addRow(row: any[] | object): void {
@@ -30,18 +29,6 @@ export default class ColumnarTableBatch implements TableBatch {
       this.columns[fieldName][this.length] = row[fieldName];
     }
     this.length++;
-  }
-
-  chunkComplete(): void {
-    this.isChunkComplete = true;
-  }
-
-  // Is this TableBatch full?
-  isFull(): boolean {
-    if (this.batchSize === 'auto') {
-      return this.isChunkComplete;
-    }
-    return this.length >= this.allocated;
   }
 
   getBatch(): Batch | null {
@@ -59,7 +46,6 @@ export default class ColumnarTableBatch implements TableBatch {
     }
 
     this.columns = [];
-    this.isChunkComplete = false;
 
     return {data: columns, schema: this.schema, length: this.length};
   }
@@ -72,7 +58,7 @@ export default class ColumnarTableBatch implements TableBatch {
     }
 
     // @ts-ignore TODO
-    this.allocated = this.allocated > 0 ? (this.allocated *= 2) : this.batchSize;
+    this.allocated = this.allocated > 0 ? (this.allocated *= 2) : DEFAULT_ROW_COUNT;
     this.columns = [];
 
     for (const fieldName in this.schema) {

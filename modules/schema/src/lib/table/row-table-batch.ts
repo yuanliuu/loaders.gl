@@ -1,4 +1,5 @@
-import {TableBatch, Schema, Batch} from './table-batch';
+import type {Schema, Batch} from '../../category/common';
+import {TableBatch} from './table-batch';
 
 type RowTableBatchOptions = {
   batchSize: number | string;
@@ -6,40 +7,20 @@ type RowTableBatchOptions = {
   optimizeMemoryUsage: boolean;
 };
 
-const DEFAULT_OPTIONS = {
-  batchSize: 'auto',
-  convertToObject: true,
-  // optimizes memory usage but increases parsing time.
-  optimizeMemoryUsage: false
-};
+const DEFAULT_ROW_COUNT = 100;
 
 export default class RowTableBatch implements TableBatch {
   schema: Schema;
-  batchSize: number | string;
-  convertToObject: boolean;
-  optimizeMemoryUsage: boolean;
+  options: RowTableBatchOptions;
 
-  length: number;
-  rows: Array<any> | null;
-  isChunkComplete: boolean;
-  cursor: number;
+  length: number = 0;
+  rows: Array<any> | null = null;
+  cursor: number = 0;
+  private _headers: Array<any> | null = null;
 
-  private _headers: Array<any> | null;
-
-  constructor(schema: Schema, options?: RowTableBatchOptions) {
-    options = {...DEFAULT_OPTIONS, ...options};
-
+  constructor(schema: Schema, options: RowTableBatchOptions) {
+    this.options = options;
     this.schema = schema;
-    this.batchSize = options.batchSize;
-    this.convertToObject = options.convertToObject;
-    this.optimizeMemoryUsage = options.optimizeMemoryUsage;
-
-    this.rows = null;
-    this.length = 0;
-    this.isChunkComplete = false;
-    this.cursor = 0;
-
-    this._headers = null;
 
     // schema is an array if there're no headers
     // object if there are headers
@@ -51,20 +32,22 @@ export default class RowTableBatch implements TableBatch {
     }
   }
 
+  rowCount(): number {
+    return this.length;
+  }
+
   addRow(row, cursor?: number): void {
-    if (!this.rows) {
-      this.rows = new Array(this.batchSize);
-      this.length = 0;
-    }
     if (Number.isFinite(cursor)) {
       this.cursor = cursor as number;
     }
 
+    this.rows = this.rows || new Array(DEFAULT_ROW_COUNT);
+
     // We can only convert if we were given a schema
-    const convertToObject = this.convertToObject && this.schema;
+    const convertToObject = this.options.convertToObject && this.schema;
     this.rows[this.length] = convertToObject ? convertRowToObject(row, this._headers) : row;
 
-    if (this.optimizeMemoryUsage) {
+    if (this.options.optimizeMemoryUsage) {
       // A workaround to allocate new strings and don't retain pointers to original strings.
       // https://bugs.chromium.org/p/v8/issues/detail?id=2869
       this.rows[this.length] = JSON.parse(JSON.stringify(this.rows[this.length]));
@@ -73,22 +56,10 @@ export default class RowTableBatch implements TableBatch {
     this.length++;
   }
 
-  chunkComplete(): void {
-    this.isChunkComplete = true;
-  }
-
-  isFull(): boolean {
-    if (this.batchSize === 'auto') {
-      return this.isChunkComplete && this.length > 0;
-    }
-    return Boolean(this.rows && this.length >= this.batchSize);
-  }
-
   getBatch(): Batch | null {
     if (this.rows) {
       const rows = this.rows.slice(0, this.length);
       this.rows = null;
-      this.isChunkComplete = false;
       return {data: rows, schema: this.schema, length: rows.length, cursor: this.cursor};
     }
     return null;
